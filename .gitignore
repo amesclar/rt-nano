@@ -1,0 +1,11 @@
+.DS_Store
+_pycache_*
+*auto_saved_files*
+*_autosave*
+*backups*
+*pyc
+*lck
+*zip
+DRC*
+fp-info-cache
+fp-lib-table
