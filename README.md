@@ -35,15 +35,59 @@ When a timer button is pressed, the system plays a predefined sequence of long a
 
 ## Wiring Diagram
 
+### Written Connections
 1. **Main Power:** Battery (+) → Toggle Switch → **12V Positive Rail**.  
-2. **Arduino Power:** 12V Positive Rail → Buck Converter (In) → 5V Out → Arduino **VIN** pin.  
-3. **Siren Control:**  
+2. **12V Power Indicator:** 12V Positive Rail → **12V LED** (+) | **12V LED** (-) → Ground.
+3. **Arduino Power:** 12V Positive Rail → Buck Converter (In) → 5V Out → Arduino **VIN** pin.  
+4. **5V Power Indicator:** 5V Out (from Buck Converter) → **5V LED** (+) | **5V LED** (-) → Ground.
+5. **Siren Control:**  
    * Siren (+) → 12V Positive Rail.  
    * Siren (-) → [TIP120](https://google.com/search?q=STMicroelectronics+Tip120+Darlington+Transistors&prds=catalogid%3A9700663524913918843%2Cgpcid%3A9003129013422811866%2CheadlineOfferDocid%3A17480337713210419607%2Cmid%3A576462841050587060%2Cproductid%3A17360020716491144779%2Cpvo%3A38%2Cpvt%3Ahg&ibp=oshop&pvo=38&opi=103135050&gl=US&hl=en&noiga=1) Collector (Middle Pin).  
    * Arduino **D8** → 1k Ohm Resistor → TIP120 Base (Left Pin).  
    * TIP120 Emitter (Right Pin) → Ground.  
-4. **Buttons (Timer):** Connect Pins **D4 (1m), D5 (2m), D6 (3m), D7 (5m)** to one side of buttons; other side to **GND**.  
-5. **Display:** **D2** (CLK), **D3** (DIO), 5V, and GND.
+6. **Buttons (Timer):** Connect Pins **D4 (1m), D5 (2m), D6 (3m), D7 (5m)** to one side of buttons; other side to **GND**.  
+7. **Display:** **D2** (CLK), **D3** (DIO), 5V, and GND.
+
+### Visual Diagram (Mermaid)
+
+```mermaid
+graph TD
+    Bat[12V Battery] -->| + | Switch[Toggle Switch]
+    Bat -->| - GND | GND[Common Ground]
+    
+    Switch -->|12V Rail| Rail[12V Positive Rail]
+    
+    Rail -->| + | LED12[12V Indicator LED]
+    LED12 -->| - | GND
+    
+    Rail -->|12V In| Buck[Buck Converter]
+    Buck -->|5V Out| 5VRail[5V Positive Rail]
+    
+    5VRail -->| + | LED5[5V Indicator LED]
+    LED5 -->| - | GND
+    
+    5VRail -->|5V In| Arduino[Arduino VIN]
+    
+    Rail -->| + | Siren[120dB Siren]
+    Siren -->| - | TIP120[TIP120 Collector]
+    Arduino -->|D8 + 1k Resistor| TIP120_Base[TIP120 Base]
+    TIP120 -->|Emitter| GND
+    
+    Arduino -->|D4| Btn1m[1 Min Button]
+    Arduino -->|D5| Btn2m[2 Min Button]
+    Arduino -->|D6| Btn3m[3 Min Button]
+    Arduino -->|D7| Btn5m[5 Min Button]
+    
+    Btn1m --> GND
+    Btn2m --> GND
+    Btn3m --> GND
+    Btn5m --> GND
+    
+    Arduino -->|D2 CLK| Disp[TM1637 Display]
+    Arduino -->|D3 DIO| Disp
+    5VRail -->|5V Out| Disp
+    Disp --> GND
+```
 
 ## Parts list
 * Quantity = 1 unless otherwise specified
@@ -67,7 +111,7 @@ When a timer button is pressed, the system plays a predefined sequence of long a
 |item|description|[Ref URL](reference url)|(approx USD price)|
 |---|---|---|---|
 |1|Arduino IDE|[Ref URL](https://www.arduino.cc/en/software)|0|
-|2|Fritzig diagram, schematic, board layout|[Ref URL](https://fritzing.org/download/)|0|
+|2|KiCAD (schematic, board layout)|[Ref URL](https://kicad.org/)|0|
 |3|Fanttik T1 Max Soldering Iron Kit|[Ref URL](https://www.amazon.com/gp/product/B0D41ZMDPD/ref=ox_sc_saved_title_1?smid=A30MIYRTO6RN4I&psc=1)|80|
 |4|IRWIN VISE-GRIP Wire Stripper|[Ref URL](https://www.amazon.com/dp/B000OQ21CA?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1)|25|
 |5|KOTTO Strong Suction Smoke Absorber|[Ref URL](https://www.amazon.com/dp/B07ZHH5H7N?ref=ppx_yo2ov_dt_b_fed_asin_title)|80|
