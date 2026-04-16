@@ -18,7 +18,7 @@
 
 // --- Configuration ---
 #define BAUD_RATE 115200
-#define MILLIS_PER_SECOND 996 // Calibrated to specific SUT hardware
+#define MILLIS_PER_SECOND 1000 // Real-world time
 #define PIN_CLK 2
 #define PIN_DIO 3
 #define PIN_BUZZER 8
@@ -67,15 +67,43 @@ const BuzzEvent seq5Min[] PROGMEM = {
 // --- Globals ---
 TM1637Display display(PIN_CLK, PIN_DIO);
 
-// --- Functions ---
+// --- Buzzer State Machine ---
+enum BuzzerState { BZ_IDLE, BZ_BUZZING, BZ_GAPPING };
+BuzzerState bzState = BZ_IDLE;
+uint8_t bzLongsLeft = 0;
+uint8_t bzShortsLeft = 0;
+unsigned long bzNextToggle = 0;
 
-void playBuzzes(int longCount, int shortCount, int elapsed,
-                const char *testName) {
+void updateBuzzer() {
+  if (bzState == BZ_IDLE)
+    return;
+
+  if (millis() < bzNextToggle)
+    return;
+
+  if (bzState == BZ_BUZZING) {
+    digitalWrite(PIN_BUZZER, LOW);
+    if (bzLongsLeft > 0)
+      bzLongsLeft--;
+    else if (bzShortsLeft > 0)
+      bzShortsLeft--;
+
+    if (bzLongsLeft > 0 || bzShortsLeft > 0) {
+      bzState = BZ_GAPPING;
+      bzNextToggle = millis() + BUZZ_GAP_MS;
+    } else {
+      bzState = BZ_IDLE;
+    }
+  } else if (bzState == BZ_GAPPING) {
+    bzState = BZ_BUZZING;
+    digitalWrite(PIN_BUZZER, HIGH);
+    bzNextToggle = millis() + (bzLongsLeft > 0 ? BUZZ_LONG_MS : BUZZ_SHORT_MS);
+  }
+}
+
+void triggerBuzzes(int longCount, int shortCount, int elapsed,
+                   const char *testName) {
   // Log BuzzerEvent
-  // Time spent here contributes to the second tick, but we log the start of it.
-  // Format: <testcase classname="BuzzerEvent" whichtest="1min" elapsed="30"
-  // type="Buzzer" longcount="0" shortcount="3"/>
-
   Serial.print(F("<testcase classname=\"BuzzerEvent\" whichtest=\""));
   Serial.print(testName);
   Serial.print(F("\" elapsed=\""));
@@ -86,29 +114,20 @@ void playBuzzes(int longCount, int shortCount, int elapsed,
   Serial.print(shortCount);
   Serial.println(F("\"/>"));
 
-  // Execute buzzes
-  // Pattern: Longs then Shorts (based on table order in spec "Long Buzzes |
-  // Short Buzzes") Spec doesn't explicitly define order but "Long ... Short"
-  // columns imply grouping.
+  if (longCount == 0 && shortCount == 0)
+    return;
 
-  for (int i = 0; i < longCount; i++) {
-    digitalWrite(PIN_BUZZER, HIGH);
-    delay(BUZZ_LONG_MS);
-    digitalWrite(PIN_BUZZER, LOW);
-    if (i < longCount - 1 || shortCount > 0) {
-      delay(BUZZ_GAP_MS);
-    }
-  }
-
-  for (int i = 0; i < shortCount; i++) {
-    digitalWrite(PIN_BUZZER, HIGH);
-    delay(BUZZ_SHORT_MS);
-    digitalWrite(PIN_BUZZER, LOW);
-    if (i < shortCount - 1) {
-      delay(BUZZ_GAP_MS);
-    }
-  }
+  // Initialize state machine
+  bzLongsLeft = longCount;
+  bzShortsLeft = shortCount;
+  bzState = BZ_BUZZING;
+  digitalWrite(PIN_BUZZER, HIGH);
+  bzNextToggle = millis() + (bzLongsLeft > 0 ? BUZZ_LONG_MS : BUZZ_SHORT_MS);
 }
+
+// --- Functions ---
+
+// playBuzzes replaced by non-blocking triggerBuzzes and updateBuzzer
 
 void updateDisplay(int secondsRemaining) {
   // MM:SS format
@@ -130,60 +149,66 @@ void runSequence(const BuzzEvent *events, int eventCount, int duration,
   Serial.print(F("\" elapsed=\"0\" type=\"Start\"/>\n"));
 
   unsigned long startMillis = millis();
+  int lastElapsed = -1;
 
-  for (int elapsed = 0; elapsed <= duration; elapsed++) {
-    // Current target start of this second is startMillis + (elapsed *
-    // MILLIS_PER_SECOND)
-    unsigned long targetStart =
-        startMillis + (unsigned long)elapsed * MILLIS_PER_SECOND;
-    while (millis() < targetStart) {
-      // Small spin wait for absolute precision at start of second
-    }
+  while (true) {
+    unsigned long currentMillis = millis();
+    updateBuzzer();
 
-    // Calculate Remaining Time
-    int remaining = duration - elapsed;
-    updateDisplay(remaining);
+    // Calculate elapsed time based on startMillis to avoid cumulative drift
+    int elapsed = (int)((currentMillis - startMillis) / MILLIS_PER_SECOND);
 
-    // Check for events
-    int lCount = 0;
-    int sCount = 0;
-    bool doBuzz = false;
-    for (int i = 0; i < eventCount; i++) {
-      int evSeconds = (int)pgm_read_word(&events[i].seconds);
-      if (evSeconds == elapsed) {
-        BuzzEvent ev;
-        memcpy_P(&ev, &events[i], sizeof(BuzzEvent));
-        lCount = ev.longCount;
-        sCount = ev.shortCount;
-        doBuzz = true;
+    if (elapsed > lastElapsed) {
+      if (elapsed > duration)
         break;
+
+      // New second threshold reached
+      int remaining = duration - elapsed;
+      updateDisplay(remaining);
+
+      // Check for events
+      int lCount = 0;
+      int sCount = 0;
+      bool doBuzz = false;
+      for (int i = 0; i < eventCount; i++) {
+        int evSeconds = (int)pgm_read_word(&events[i].seconds);
+        if (evSeconds == elapsed) {
+          BuzzEvent ev;
+          memcpy_P(&ev, &events[i], sizeof(BuzzEvent));
+          lCount = ev.longCount;
+          sCount = ev.shortCount;
+          doBuzz = true;
+          break;
+        }
       }
+
+      if (elapsed == duration) {
+        // Log EndEvent before final buzzer
+        Serial.print(F("<testcase classname=\"EndEvent\" whichtest=\""));
+        Serial.print(name);
+        Serial.print(F("\" elapsed=\""));
+        Serial.print(elapsed);
+        Serial.println(F("\" type=\"End\"/>"));
+      }
+
+      if (doBuzz) {
+        triggerBuzzes(lCount, sCount, elapsed, name);
+      }
+
+      lastElapsed = elapsed;
     }
 
-    if (elapsed == duration) {
-      // Log EndEvent before final buzzer to minimize reported duration drift
-      Serial.print(F("<testcase classname=\"EndEvent\" whichtest=\""));
-      Serial.print(name);
-      Serial.print(F("\" elapsed=\""));
-      Serial.print(elapsed);
-      Serial.println(F("\" type=\"End\"/>"));
-    }
-
-    if (doBuzz) {
-      playBuzzes(lCount, sCount, elapsed, name);
-    }
-
-    if (elapsed == duration)
-      break;
-
-    // No need for a simple delay here. We will catch up in the NEXT loop
-    // iteration using the 'while (millis() < targetStart)' logic for the next
-    // 'elapsed'.
+    // Yield to avoid blocking other potential background tasks if added later
+    // In this simple sketch, we just loop as fast as possible for timing
+    // precision.
   }
 
-  // Clear display or leave 00:00? Spec doesn't say.
-  // Usually regatta timers stay at 00:00 or reset.
-  // We'll leave it at 00:00 as it was the last update.
+  // Final wait for buzzers to finish if needed?
+  // Spec implies we exit sequence immediately after duration, but buzzer
+  // might still be going.
+  while (bzState != BZ_IDLE) {
+    updateBuzzer();
+  }
 }
 
 // Track previous button states for edge detection, initialized to HIGH by
