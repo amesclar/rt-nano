@@ -59,6 +59,7 @@ When a timer button is pressed, the system plays a predefined sequence of long a
 6. **Buttons (Timer):** Connect Pins **D4 (1m), D5 (2m), D6 (3m), D7 (5m)** to one side of buttons; other side to **GND**.  
 7. **Display:** **D2** (CLK), **D3** (DIO), 5V, and GND.
 8. **External Reset Switch:** Arduino **RESET** pin → Momentary Button → Ground.
+9. **Voltmeter:** 12V Positive Rail → **Voltmeter** (Red/Power) | **Voltmeter** (Black/GND) → Ground.
 
 ### Visual Diagram (Mermaid)
 
@@ -71,6 +72,9 @@ graph TD
     
     Rail -->| + | LED12[12V Indicator LED]
     LED12 -->| - | GND
+    
+    Rail -->| + | VM[12V Digital Voltmeter]
+    VM -->| - | GND
     
     Rail -->|12V In| Buck[Buck Converter]
     Buck -->|5V Out| 5VRail[5V Positive Rail]
@@ -111,7 +115,7 @@ graph TD
 
 - Quantity = 1 unless otherwise specified
 
-- Total cost approximately $116 (there will be extra parts)
+- Total cost approximately $126 (there will be extra parts)
 
 |Item|Description|Ref URL|Approx USD price|Image|
 |---|---|---|---|---|
@@ -127,6 +131,7 @@ graph TD
 | |(Note: 4 for timers, 1 for buzzer, 1 for reset, 6 spares)|| | |
 |10|BUNKER HILL SECURITY 0.50 Caliber Ammo Box|[Ref URL](https://www.harborfreight.com/050-caliber-ammo-box-57766.html)|9|![alt text](images/ammo-box.png)|
 |11|5 Pack LM2596 DC to DC Buck Converter 3.0-40V to 1.5-35V Adjustable Voltage Regulator Electronic Voltage Stabilizer Power Supply Step Down Module|[Ref URL](https://www.amazon.com/dp/B0DBVYP91F?psc=1&smid=A2E1XB0KAFTH8V&ref_=chk_typ_imgToDp)|8|![alt text](images/buck-converter.jpg)|
+|12|0.28" LED Mini Digital DC Voltmeter|[Ref URL](https://www.amazon.com/dp/B08RYPRZFF?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1)|10|![alt text](images/digital-voltmeter.jpg)|
 
 ## Tools
 
